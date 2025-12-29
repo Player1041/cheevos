@@ -23,7 +23,7 @@ loadingScreen = byte(0x0d4420)
 #0x00 - No
 #0x01 - Yes
 
-raceOutcome = Condition(tbyte(0x03e378) >> dword(0x00)).with_flag(remember) # Pointer
+raceOutcome = (tbyte(0x03e378) >> dword(0x00)).with_flag(remember) # Pointer
 raceData = (tbyte(0x1181a8) >> (tbyte(0x02A0)))
 
 modeAddress = byte(0x0e3746)
@@ -45,7 +45,47 @@ raceState = (raceData >> byte(0x38))
 #0x05 - Win/Lose
 #0x06 - Race result
 
-playerWin = Condition((raceData >> dword(0xa0)) == recall())
+character = byte(0x0e3415)
+#-1 if not in Championship Mode after Mystery (Bebe becomes 0x0b, Shelly becomes 0x0c, etc)
+#0x00 - Stan
+#0x01 - Kyle
+#0x02 - Cartman
+#0x03 - Kenny
+#0x04 - Wendy
+#0x05 - Chef
+#0x06 - Officer Barbrady
+#0x07 - Uncle Jimbo
+#0x08 - Random
+#0x09 - Pip
+#0x0a - Mr. Garrison
+#0x0b - Mystery
+#0x0c - Bebe
+#0x0d - Shelly
+#0x0e - Tweek
+#0x0f - Mr. Mackey
+#0x10 - Cartman Cop
+#0x11 - Skuzzlebutt
+#0x12 - Mrs. Broflovski
+#0x13 - Ms. Cartman
+#0x14 - Big Gay Al
+#0x15 - Ike
+#0x16 - Visitor
+#0x17 - Ned
+#0x18 - Mephesto
+#0x19 - Death
+#0x1a - Grandpa
+#0x1b - Marvin
+#0x1c - Jesus
+#0x1d - Terrance & Phillip
+#0x1e - Damien
+#0x1f - Satan
+#0x20 - Wimpy Stan
+#0x21 - Kyle Vampire
+#0x22 - Kenny Football
+#0x23 - Cartman Homie
+#0x24 - Chef Braveheart
+
+playerWin = (raceData >> dword(0xa0)) == recall()
 raceIndicator = byte(0x0e3152)
 def raceName(race: int):
     match race:
@@ -262,6 +302,8 @@ def achievementTitle(id: str):
             return "Magical Mystery Tour"
 
         # Extras
+        case "intro":
+            return "Come on Up to South Park!"
         case _:
             return f"Missing Name"
 
@@ -273,8 +315,6 @@ creditIncrease = [
 ]
 ### Initialize Set ###
 mySet = AchievementSet(game_id=6675, title="South Park Rally")
-achID = 0
-
 
 ### Achievements ###
 
@@ -287,21 +327,22 @@ for race in range(0x00, 0x0e):
         raceIndicator == race,
         raceOutcome,
         playerWin,
-        Condition(raceState.delta() == 0x04),
+        raceState.delta() == 0x04,
         raceState == 0x05,
     ]
 
-    champAchievement = Achievement(achievementTitle(f"{order}_champ"), f"Win the {raceName(race)} race in Championship mode", 1, achID)
+    champAchievement = Achievement(achievementTitle(f"{order}_champ"), f"Win the {raceName(race)} race in Championship mode", 1)
     champAchievement.add_core(championshipAchievementLogic)
     mySet.add_achievement(champAchievement)
-    achID += 1
     order += 1
 
-
-
-
 # Unlocks
+order = 1
+for character in range(0x09, 0x21):
+    overlapCharacterIDs = []
+    characterUnlockLogic = [
 
+    ]
 
 # Credit Achievements
 order = 1
@@ -314,46 +355,31 @@ for race in range(0x00, 0x0e):
         creditIncrease,
     ]
 
-    credAchievement = Achievement(achievementTitle(f"{order}_cred"), f"Collect the Extra Credit during the {raceName(race)} race in Championship mode", 1, achID)
+    credAchievement = Achievement(achievementTitle(f"{order}_cred"), f"Collect the Extra Credit during the {raceName(race)} race in Championship mode", 1)
     credAchievement.add_core(creditAchievementLogic)
 
     mySet.add_achievement(credAchievement)
-    achID += 1
     order += 1
     
 
-
-
-
-
-### Achievements ###
-
-intro = Achievement("Come on Up to South Park!", "Watch the whole South Park intro", 5, achID)
+# Intro - likely UWC but was a good pointer test
+intro = Achievement(achievementTitle("intro"), "Watch the whole South Park intro", 0)
 introCore = [
     (gameState.delta() == 0x02).with_flag(or_next),
     (gameState.delta() == 0x03).with_flag(reset_if),
     (gameState == 0x06)
 ]
 
-introAlt1 = [
-    (hz == 0x05).with_flag(and_next),
-    (loadingScreen == 0x00).with_flag(and_next),
-    (gameState.delta() == 0x04).with_hits(1420)
-]
-
-introAlt2 = [
-    (hz == 0x06).with_flag(and_next),
-    (loadingScreen == 0x00).with_flag(and_next),
-    (gameState.delta() == 0x04).with_hits(1700),
-]
-
+def introAlts(currentHz: int):
+    return [
+        (hz == currentHz).with_flag(and_next),
+        (loadingScreen == 0x00).with_flag(and_next),
+        (gameState.delta() == 0x04).with_hits(1420 if currentHz == 0x05 else 1700)
+    ]
 
 intro.add_core(introCore)
-intro.add_alt(introAlt1)
-intro.add_alt(introAlt2)
-
-intro.add_alt(creditIncrease)
-
+intro.add_alt(introAlts(0x05))
+intro.add_alt(introAlts(0x06))
 mySet.add_achievement(intro)
 
 mySet.save()
