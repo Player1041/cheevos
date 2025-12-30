@@ -90,11 +90,6 @@ playerWin = (raceData >> dword(0xa0)) == recall()
 
 resetToCountdown = (raceState == 0x03).with_hits(1)
 
-unlockConditions1 = (raceData >> dword(0xc0))
-unlockConditions2 = (raceData >> dword(0xc4))
-unlockConditions3 = (raceData >> dword(0xc8))
-unlockConditions4 = (raceData >> dword(0xcc))
-
 unlockTimers = (raceData >> float32(0xb0))
 
 rallyDays2Checkpoint = (raceData >> byte(0x94))
@@ -327,6 +322,36 @@ def commonLogic(race: int):
         raceIndicator == race
         ]
 
+def unlocks2(race: int, condition: int, conditionAddress: int):
+    address = (raceData >> byte(conditionAddress))
+    return [
+        (demoCheck).with_flag(measured_if),
+        (championship).with_flag(measured_if),
+        (raceIndicator == race).with_flag(measured_if),
+        (address.delta() == condition - 1),
+        (address == condition).with_flag(measured),
+        raceState == 0x04
+    ]
+playerCheckpoint = (raceData >> byte(0xa4))
+playerLap = (raceData >> byte(0xb4))
+
+ai1Checkpoint = (raceData >> byte(0xd0))
+ai1Lap = (raceData >> byte(0xe0))
+ai2Checkpoint = (raceData >> byte(0xfc))
+ai2Lap = (raceData >> byte(0x10c))
+ai3Checkpoint = (raceData >> byte(0x128))
+ai3Lap = (raceData >> byte(0x138))
+ai4Checkpoint = (raceData >> byte(0x154))
+ai4Lap = (raceData >> byte(0x164))
+ai5Checkpoint = (raceData >> byte(0x180))
+ai5Lap = (raceData >> byte(0x190))
+
+def waitingOnWin():
+    return [
+        raceState.delta() == 0x04,
+        (raceState == 0x05).with_flag(trigger)
+    ]
+
 credits = byte(0x0e3251)
 creditIncrease = [
     Condition(credits.delta()).with_flag(add_source),
@@ -335,7 +360,6 @@ creditIncrease = [
 ]
 ### Initialize Set ###
 mySet = AchievementSet(game_id=6675, title="South Park Rally")
-achID = 1
 ### Achievements ###
 
 # Championship
@@ -349,91 +373,163 @@ for race in range(0x00, 0x0e):
         raceState == 0x05,
     ]
 
-    champAchievement = Achievement(achievementTitle(f"{order}_champ"), f"Win the {raceName(race)} race in Championship mode", 1, achID)
+    champAchievement = Achievement(achievementTitle(f"{order}_champ"), f"Win the {raceName(race)} race in Championship mode", 1)
     champAchievement.add_core(championshipAchievementLogic)
     mySet.add_achievement(champAchievement)
     order += 1
-    achID += 1
+    
 
 # Unlocks
 
 # Garrison
-garrisonUnlockLogic = [
-    *commonLogic(0x01),
-    raceOutcome,
-    playerWin.with_flag(trigger),
-    resetToCountdown
-]
+def garrisonUnlock():
+    garrisonUnlockLogic = [
+        *commonLogic(0x01),
+        raceOutcome,
+        playerWin.with_flag(trigger),
+        resetToCountdown
+    ]
 
-for checkpoint in range(0x00, 0x03):
-    bit_func = getattr(helpers, f"bit{checkpoint}")
+    for checkpoint in range(0x00, 0x03):
+        bit_func = getattr(helpers, f"bit{checkpoint}")
 
-    droveOverCheckpoint = (raceData >> bit_func(0xc0))
-    garrisonUnlockLogic.append((droveOverCheckpoint == 0x00).with_flag(and_next))
-    garrisonUnlockLogic.append((rallyDays2Checkpoint.delta() > 0x00).with_flag(reset_if))
+        droveOverCheckpoint = (raceData >> bit_func(0xc0))
+        garrisonUnlockLogic.append((droveOverCheckpoint == 0x00).with_flag(and_next))
+        garrisonUnlockLogic.append((rallyDays2Checkpoint.delta() > 0x00).with_flag(reset_if))
 
-garrisonUnlockLogic.append((raceState != 0x04).with_flag(and_next))
-garrisonUnlockLogic.append(((raceData >> byte(0x0c)) != 0x0f).with_flag(reset_if))
-garrisonUnlockLogic.append(((raceData >> byte(0x0c)) == 0x0f).with_flag(reset_if))
-garrisonUnlockLogic.append((raceState.delta() == 0x04))
-garrisonUnlockLogic.append((raceState == 0x05).with_flag(trigger))
+    garrisonUnlockLogic.append((raceState != 0x04).with_flag(and_next))
+    garrisonUnlockLogic.append(((raceData >> byte(0x0c)) != 0x0f).with_flag(reset_if))
+    garrisonUnlockLogic.append(((raceData >> byte(0x0c)) == 0x0f).with_flag(reset_if))
+    garrisonUnlockLogic.append((raceState.delta() == 0x04))
+    garrisonUnlockLogic.append((raceState == 0x05).with_flag(trigger))
 
 
-garrisonAchievement = Achievement(achievementTitle("mr_garrison"), "Unlock Mr. Garrison by being the only player to pass over each checkpoint with the trophy in Rally Days #2", 1, achID)
-garrisonAchievement.add_core(garrisonUnlockLogic)
-mySet.add_achievement(garrisonAchievement)
-achID += 1
+    garrisonAchievement = Achievement(achievementTitle("mr_garrison"), "Unlock Mr. Garrison by being the only player to pass over each checkpoint with the trophy in Rally Days #2", 2)
+    garrisonAchievement.add_core(garrisonUnlockLogic)
+    mySet.add_achievement(garrisonAchievement)
+    
 
 # Pip
+def pipUnlock():
+    pipUnlockLogic = [
+        *commonLogic(0x01),
+        raceOutcome,
+        playerWin.with_flag(trigger),
+        resetToCountdown
+    ]
 
-pipUnlockLogic = [
-    *commonLogic(0x01),
-    raceOutcome,
-    playerWin.with_flag(trigger),
-    resetToCountdown
-]
+    for checkpoint in range(0x00, 0x03):
+        print(checkpoint)
+        bit_func = getattr(helpers, f"bit{checkpoint}")
+        droveOverCheckpoint = (raceData >> bit_func(0xc0))
 
-for checkpoint in range(0x00, 0x03):
-    print(checkpoint)
-    bit_func = getattr(helpers, f"bit{checkpoint}")
-    droveOverCheckpoint = (raceData >> bit_func(0xc0))
+        if checkpoint == 0x00:
+            pipUnlockLogic.append((droveOverCheckpoint == 0x00).with_flag(and_next))
+            pipUnlockLogic.append((rallyDays2Checkpoint.delta() > 0x00).with_flag(reset_if))
+        else:
+            pipUnlockLogic.append((droveOverCheckpoint == 0x01).with_flag(reset_if))
+
+
+
+    pipUnlockLogic.append((raceState != 0x04).with_flag(and_next))
+    pipUnlockLogic.append(((raceData >> byte(0x0c)) != 0x09).with_flag(reset_if))
+    pipUnlockLogic.append(((raceData >> byte(0x0c)) == 0x09).with_flag(reset_if))
+    pipUnlockLogic.append((raceState.delta() == 0x04))
+    pipUnlockLogic.append((raceState == 0x05).with_flag(trigger))
+
+
+    pipAchievement = Achievement(achievementTitle("pip"), "Unlock Pip by passing over only Checkpoints 1 and 4 with the trophy in Rally Days #2", 2)
+    pipAchievement.add_core(pipUnlockLogic)
+    mySet.add_achievement(pipAchievement)
     
-    if checkpoint == 0x00:
-        pipUnlockLogic.append((droveOverCheckpoint == 0x00).with_flag(and_next))
-        pipUnlockLogic.append((rallyDays2Checkpoint.delta() > 0x00).with_flag(reset_if))
-    else:
-        pipUnlockLogic.append((droveOverCheckpoint == 0x01).with_flag(reset_if))
-
-
-
-pipUnlockLogic.append((raceState != 0x04).with_flag(and_next))
-pipUnlockLogic.append(((raceData >> byte(0x0c)) != 0x09).with_flag(reset_if))
-pipUnlockLogic.append(((raceData >> byte(0x0c)) == 0x09).with_flag(reset_if))
-pipUnlockLogic.append((raceState.delta() == 0x04))
-pipUnlockLogic.append((raceState == 0x05).with_flag(trigger))
-
-
-pipAchievement = Achievement(achievementTitle("pip"), "Unlock Pip by passing over only Checkpoints 1 and 4 with the trophy in Rally Days #2", 1, achID)
-pipAchievement.add_core(pipUnlockLogic)
-mySet.add_achievement(pipAchievement)
-achID += 1
 
 # Bebe
-bebeUnlockLogic = [
-    *commonLogic(0x02),
-    raceOutcome,
-    playerWin,
-    (unlockTimers.delta() < float32(120.0)).with_flag(reset_if),
-    resetToCountdown,
-    raceState.delta() == 0x04,
-    (raceState == 0x05).with_flag(trigger)
-]
+def bebeUnlock():
+    bebeUnlockLogic = [
+        *commonLogic(0x02),
+        raceOutcome,
+        playerWin,
+        (unlockTimers.delta() < 120.0).with_flag(reset_if),
+        resetToCountdown,
+        waitingOnWin()
+    ]
 
-bebeAchievement = Achievement(achievementTitle("bebe"), "Unlock Bebe by winning the", 1, achID)
-bebeAchievement.add_core(bebeUnlockLogic)
-mySet.add_achievement(bebeAchievement)
-achID += 1
+    bebeAchievement = Achievement(achievementTitle("bebe"), "Unlock Bebe by losing without touching the cure in Cow Days", 2)
+    bebeAchievement.add_core(bebeUnlockLogic)
+    mySet.add_achievement(bebeAchievement)
+    
 
+# Extra Skins
+def extraSkinsUnlock():
+    extraSkinsLogic = unlocks2(0x03, 0x03, 0xc8)
+    extraSkinsAchievement = Achievement(achievementTitle("extra_skins"), "Unlock the extra skins for The Boys and Chef by collecting all 3 Golden Cows in the Valentine's Day race", 2)
+    extraSkinsAchievement.add_core(extraSkinsLogic)
+    mySet.add_achievement(extraSkinsAchievement)
+    
+
+# Tweek
+def tweekUnlock():
+    tweekUnlockLogic = unlocks2(0x04, 0x05, 0xc8)
+    tweekAchievement = Achievement(achievementTitle("tweek"), "Unlock Tweek by using 5 caffeine boosts from the blue power up boxes in the Spring Cleaning race", 2)
+    tweekAchievement.add_core(tweekUnlockLogic)
+    mySet.add_achievement(tweekAchievement)
+
+def cartmanCopUnlock():
+    cartmanCopLogic = unlocks2(0x05, 0x05, 0xc0)
+    cartmanCopAchievement = Achievement(achievementTitle("cartman_cop"), "Unlock Cartman Cop by hitting Chicken Lover's bus 5 times with Salty Balls in the Read a Book Day race", 2)
+    cartmanCopAchievement.add_core(cartmanCopLogic)
+    mySet.add_achievement(cartmanCopAchievement)
+
+def skuzzlebuttUnlock():
+    skuzzlebuttLogic = unlocks2(0x06, 0x01, 0xc8)
+    skuzzlebuttAchievement = Achievement(achievementTitle("skuzzlebutt"), "Unlock Skuzzlebutt by collecting the Golden Cow during the Easter race", 2)
+    skuzzlebuttAchievement.add_core(skuzzlebuttLogic)
+    mySet.add_achievement(skuzzlebuttAchievement)
+
+def mrsBrovlofskiUnlock():
+    mrsBrovlofskiLogic = unlocks2(0x06, 0x01, 0xcc)
+    mrsBrovlofskiAchievement = Achievement(achievementTitle("mrs_broflovski"), "Unlock Mrs. Broflovski by collecting the Pie during the Easter Race", 2)
+    mrsBrovlofskiAchievement.add_core(mrsBrovlofskiLogic)
+    mySet.add_achievement(mrsBrovlofskiAchievement)
+
+def msCartmanUnlock():
+    msCartmanLogic = [
+        *commonLogic(0x07),
+        raceOutcome,
+        playerWin,
+        resetToCountdown,
+        (playerCheckpoint).with_flag(trigger)
+        (ai1Checkpoint != 0x00).with_flag(reset_if),
+        (ai2Checkpoint != 0x00).with_flag(reset_if),
+        (ai3Checkpoint != 0x00).with_flag(reset_if),
+        (ai4Checkpoint != 0x00).with_flag(reset_if),
+        (ai5Checkpoint != 0x00).with_flag(reset_if),
+        *waitingOnWin()
+    ]
+    msCartmanAchievement = Achievement(achievementTitle("ms_cartman"), "Unlock Ms. Cartman by being the only player to deliver lemonade during the Pink Lemonade race", 2)
+    msCartmanAchievement.add_core(msCartmanLogic)
+    mySet.add_achievement(msCartmanAchievement)
+
+def NedUnlock():
+    nedLogic = unlocks2(0x09, 0x0c, 0xc8)
+    nedAchievement = Achievement(achievementTitle("ned"), "Unlock Ned by winning after using 12 Caffeine Boosts or Terrance Boosts during the Independence Day race", 2)
+    nedAchievement.add_core(nedLogic)
+    mySet.add_achievement(nedAchievement)
+
+
+
+
+
+garrisonUnlock()
+pipUnlock()
+bebeUnlock()
+extraSkinsUnlock()
+tweekUnlock()
+cartmanCopUnlock()
+skuzzlebuttUnlock()
+mrsBrovlofskiUnlock()
+msCartmanUnlock()
+NedUnlock()
 
 # Unlocks based on ++0xc0
 # Garrison
@@ -475,15 +571,15 @@ for race in range(0x00, 0x0e):
         *creditIncrease,
     ]
 
-    credAchievement = Achievement(achievementTitle(f"{order}_cred"), f"Collect the Extra Credit during the {raceName(race)} race in Championship mode", 1, achID)
+    credAchievement = Achievement(achievementTitle(f"{order}_cred"), f"Collect the Extra Credit during the {raceName(race)} race in Championship mode", 1)
     credAchievement.add_core(creditAchievementLogic)
 
     mySet.add_achievement(credAchievement)
     order += 1
-    achID += 1
+    
 
 # Intro - likely UWC but was a good pointer test
-intro = Achievement(achievementTitle("intro"), "Watch the whole South Park intro", 0, achID)
+intro = Achievement(achievementTitle("intro"), "Watch the whole South Park intro", 0)
 introCore = [
     (gameState.delta() == 0x02).with_flag(or_next),
     (gameState.delta() == 0x03).with_flag(reset_if),
@@ -501,6 +597,6 @@ intro.add_core(introCore)
 intro.add_alt(introAlts(0x05))
 intro.add_alt(introAlts(0x06))
 mySet.add_achievement(intro)
-achID += 1
+
 
 mySet.save("D:\\RetroAchievements\\RALibretro\\RACache\\Data")
