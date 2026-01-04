@@ -139,21 +139,21 @@ def trackName(track: int, forDesc: bool = False):
     if forDesc:
         match track:
             case 0x00:
-                return "City"
+                return "in the City"
             case 0x01:
-                return "Forest"
+                return "in the Forest"
             case 0x02:
-                return "Big Gay Al's"
+                return "at Big Gay Al's"
             case 0x03:
-                return "Volcano"
+                return "in the Volcano"
             case 0x04:
-                return "Mountain"
+                return "on the Mountain"
             case 0x05:
-                return "Farm"
+                return "on the Farm"
             case 0x06:
-                return "Sewer"
+                return "in the Sewer"
             case 0x07:
-                return "Carnival"
+                return "at the Carnival"
             case 0x08:
                 return "Gridiron"
             case 0x09:
@@ -184,6 +184,7 @@ def trackName(track: int, forDesc: bool = False):
                 return "Random"
             case _:
                 return "Unknown"
+
 def achievementTitle(id: str):
     match id:
         case "1_champ":
@@ -444,8 +445,7 @@ for race in range(0x00, 0x0e):
         *commonChampionshipLogic(race),
         raceOutcome,
         playerWin,
-        raceState.delta() == 0x04,
-        raceState == 0x05,
+        *waitingOnWin()
     ]
 
     champAchievement = Achievement(achievementTitle(f"{order}_champ"), f"Win the {raceName(race)} race in Championship mode", 1)
@@ -454,21 +454,44 @@ for race in range(0x00, 0x0e):
     order += 1 
 
 # Mini Championship
-# Championship
+# Carnival, City Farm, BGA, Sewers, Forest, Mountain, Volcano
+raceOrder = [0x07, 0x00, 0x05, 0x02, 0x06, 0x01, 0x04, 0x03]
 order = 1
-for race in range(0x00, 0x08):
+for race in raceOrder:
     miniChampionshipAchievementLogic = [
         *commonMiniChampionshipLogic(race),
         raceOutcome,
         playerWin,
-        raceState.delta() == 0x04,
-        raceState == 0x05,
+        *waitingOnWin(),
     ]
 
-    champAchievement = Achievement(achievementTitle(f"{order}_mini"), f"Win the {raceName(race)} race in Mini Championship mode", 1)
-    champAchievement.add_core(championshipAchievementLogic)
-    mySet.add_achievement(champAchievement)
-    order += 1 
+    miniChampAchievement = Achievement(achievementTitle(f"{order}_mini"), f"Win the race {trackName(race, True)} in Mini Championship mode", 1)
+    miniChampAchievement.add_core(miniChampionshipAchievementLogic)
+    mySet.add_achievement(miniChampAchievement)
+    order += 1
+
+# Mini Championship - Beat my Time
+# Carnival, City Farm, BGA, Sewers, Forest, Mountain, Volcano
+raceOrder = [0x07, 0x00, 0x05, 0x02, 0x06, 0x01, 0x04, 0x03]
+timesToBeat = [126.71, 168.57, 82.07, 113.07, 218.18, 113.07, 157.47, 135.60]
+timesToBeatDesc = ["2:06.72", "2:48.58", "1:22.08", "1:53.08", "3:38.19", "2:15.61", "2:37.48", "1:53.08"]
+order = 1
+raceTime = (raceData >> float32(0x3c))
+for race in raceOrder:
+    print(timesToBeat[raceOrder.index(race)])
+    timeTrialAchievementLogic = [
+        *commonMiniChampionshipLogic(race),
+        raceOutcome,
+        playerWin,
+        resetToCountdown,
+        *waitingOnWin(),
+        (raceTime > timesToBeat[raceOrder.index(race)]).with_flag(reset_if)
+    ]
+
+    timeTrialAchievement = Achievement(achievementTitle(f"{order}_dev"), f"Beat PS2Hagrid's time of {timesToBeatDesc[raceOrder.index(race)]} {trackName(race, True)} in Mini Championship mode", 1)
+    timeTrialAchievement.add_core(timeTrialAchievementLogic)
+    mySet.add_achievement(timeTrialAchievement)
+    order += 1
 
 # Unlocks
 
@@ -585,7 +608,7 @@ def msCartmanUnlock():
         raceOutcome,
         playerWin,
         resetToCountdown,
-        (playerCheckpoint).with_flag(trigger),
+        (playerCheckpoint == 0x04).with_flag(trigger),
         (ai1Checkpoint != 0x00).with_flag(reset_if),
         (ai2Checkpoint != 0x00).with_flag(reset_if),
         (ai3Checkpoint != 0x00).with_flag(reset_if),
