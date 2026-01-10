@@ -1,4 +1,5 @@
 ### Imports ###
+from typing import List
 from pathlib import Path
 import core.helpers as helpers
 from core.helpers import *  
@@ -478,17 +479,14 @@ timesToBeatDesc = ["2:06.72", "2:48.58", "1:22.08", "1:53.08", "3:38.19", "2:15.
 order = 1
 raceTime = (raceData >> float32(0x3c))
 for race in miniChampRaceOrder:
-    print(timesToBeat[miniChampRaceOrder.index(race)])
     timeTrialAchievementLogic = [
-        #commonMiniChampionshipLogic(race),
-        #raceOutcome,
-        #playerWin,
-        #resetToCountdown,
-        #waitingOnWin(),
-        #(raceTime > timesToBeat[raceOrder.index(race)]).with_flag(reset_if)
-        byte(0x02) == 0x02
+        commonMiniChampionshipLogic(race),
+        raceOutcome,
+        playerWin,
+        resetToCountdown,
+        waitingOnWin(),
+        (raceTime > timesToBeat[raceOrder.index(race)]).with_flag(reset_if)
     ]
-    print(f"{achievementTitle(f"{order}_dev")} : Beat PS2Hagrid's time of {timesToBeatDesc[miniChampRaceOrder.index(race)]} {trackName(race, True)} in Mini Championship mode")
     timeTrialAchievement = Achievement(achievementTitle(f"{order}_dev"), f"Beat PS2Hagrid's time of {timesToBeatDesc[miniChampRaceOrder.index(race)]} {trackName(race, True)} in Mini Championship mode", 1)
     timeTrialAchievement.add_core(timeTrialAchievementLogic)
     mySet.add_achievement(timeTrialAchievement)
@@ -727,7 +725,103 @@ for race in range(0x00, 0x0e):
 
     mySet.add_achievement(credAchievement)
     order += 1
+
+# Race as X in Y on Z race
+
+# Race as X in Y track (any race)
+
+trackToRaces = [
+    [], # City
+    [], # Forest
+    [0x03, 0x07], # Big Gay Al's
+    [], # Volcano
+    [0x06, 0x09], # Mountain
+    [], # Farm
+    [0x04], # Sewer
+    [], # Carnival
+]
+
+def challengeChar(char: List[int]):
+    for index, c in enumerate(char):
+        if index + 1== len(char):
+            return(character == c)
+        else:
+            return((character == c).with_flag(or_next))
+
+
+
+def charOnTrack(char: List[int], track: int):
+    coreLogic = [
+        demoCheck,
+        modeAddress < 3
+    ]
+
+    # Alt 1
+    alt1Logic = [
+        raceOutcome,
+        playerWin,
+        modeAddress != 2, # not arcade
+        (challengeChar(char))
+    ]
+
+    alt1logic.append(challengeChar(char))
+    for index, race in enumerate(trackToRaces[track]):
+        if index + 1== len(trackToRaces[track]):
+            alt1Logic.append(raceIndicator == race)
+        else:
+            alt1Logic.append((raceIndicator == race).with_flag(or_next))
+    alt1Logic.append(trackIndicator == track)
+    alt1Logic.append(waitingOnWin())
     
+    # Alt 2
+    alt2Logic = [
+        raceOutcome,
+        playerWin,
+        modeAddress == 2,
+    ]
+
+    for index, c in enumerate(char):
+        if c >= 0x0c:
+            c = c - 1
+        if index + 1 == len(char):
+            alt2Logic.append(character == c)
+        else:
+            alt2Logic.append((character == c).with_flag(or_next))
+
+    alt2Logic.append(trackIndicator == track)
+    alt2Logic.append(waitingOnWin())
+    return [coreLogic, alt1Logic, alt2Logic]
+
+# BGA on BGA
+bgaBGA = Achievement(achievementTitle("1_challenge"), "Win any race at Big Gay Al's as Big Gay Al", 2)
+bgaLogic = charOnTrack([0x14], 0x02)
+
+bgaBGA.add_core(bgaLogic[0])
+bgaBGA.add_alt(bgaLogic[1])
+bgaBGA.add_alt(bgaLogic[2])
+mySet.add_achievement(bgaBGA)
+
+# Visitor in Sewers
+visitorSewers = Achievement(achievementTitle("2_challenge"), "Win any race in the Sewer as Visitor", 2)
+visitorLogic = charOnTrack([0x16], 0x06)
+
+visitorSewers.add_core(visitorLogic[0])
+visitorSewers.add_alt(visitorLogic[1])
+visitorSewers.add_alt(visitorLogic[2])
+mySet.add_achievement(visitorSewers)
+
+# Ned or Jimbo in Mountain
+nedJimboMountain = Achievement(achievementTitle("3_challenge"), "Win any race in the Mountain as either Jimbo or Ned", 2)
+nedJimboLogic = charOnTrack([0x07, 0x17], 0x04)
+
+nedJimboMountain.add_core(nedJimboLogic[0])
+nedJimboMountain.add_alt(nedJimboLogic[1])
+nedJimboMountain.add_alt(nedJimboLogic[2])
+mySet.add_achievement(nedJimboMountain)
+
+
+
+
 
 # Intro - likely UWC but was a good pointer test
 intro = Achievement(achievementTitle("intro"), "Watch the whole South Park intro", 0)
