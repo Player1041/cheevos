@@ -1,12 +1,12 @@
 ### Imports ###
 from typing import List
 from pathlib import Path
-import core.helpers as helpers
-from core.helpers import *  
-from core.constants import *
-from core.condition import Condition
-from models.set import AchievementSet
-from models.achievement import Achievement
+import pycheevos.core.helpers as helpers
+from pycheevos.core.helpers import *  
+from pycheevos.core.constants import *
+from pycheevos.core.condition import Condition
+from pycheevos.models.set import AchievementSet
+from pycheevos.models.achievement import Achievement
 
 ### Define Addresses ###
 
@@ -26,7 +26,7 @@ loadingScreen = byte(0x0d4420)
 #0x00 - No
 #0x01 - Yes
 
-raceOutcome = (tbyte(0x03e378) >> dword(0x00)).with_flag(remember)
+raceOutcome = remember(tbyte(0x03e378) >> dword(0x00))
 raceData = (tbyte(0x1181a8) >> (tbyte(0x02A0)))
 
 modeAddress = byte(0x0e3746)
@@ -347,25 +347,25 @@ def achievementTitle(id: str):
         case "6_challenge":
             return "What Would Jesus Do?"
         case "7_challenge":
-            return "Mom Said It's MY Turn with the Laser"
-        case "8_challenge":
             return "Volcanic Trophy Giving Ceremony"
-        case "9_challenge":
+        case "8_challenge":
             return "Pine Fresh Undies"
-        case "10_challenge":
+        case "9_challenge":
             return "Lemonade! Fresh Lemonade!"
-        case "11_challenge":
+        case "10_challenge":
             return "In Memorium of Doing Super"
-        case "12_challenge":
+        case "11_challenge":
             return "Christmas in the Hills"
-        case "13_challenge":
+        case "12_challenge":
              return "Super Complicated Sewer Stuff"
+        case "13_challenge":
+            return "Mom Said It's MY Turn with the Laser"
         case "14_challenge":
             return "Magical Mystery Tour"
 
         # Extras
         case "intro":
-            return "Come on Up to South Park!"
+            return "Come on Down to South Park!"
         case _:
             return f"Missing Name"
 
@@ -398,14 +398,14 @@ def unlocks(race: int, con: int, conditionAddress: int, shouldMeasure: bool = Fa
         raceState == 0x04
     ]
     if shouldMeasure:
-        logic.insert(0, (demoCheck).with_flag(measured_if)) # type: ignore
-        logic.insert(1, (championship).with_flag(measured_if)) # type: ignore
-        logic.insert(2, (raceIndicator == race).with_flag(measured_if)) # type: ignore
-        logic.insert(4, (address == con).with_flag(measured))
+        logic.insert(0, measured_if(demoCheck))
+        logic.insert(1, measured_if(championship))
+        logic.insert(2, measured_if(raceIndicator == race))
+        logic.insert(4, measured(address == con))
     else:
-        logic.insert(0, demoCheck) # type: ignore
-        logic.insert(1, championship) # type: ignore
-        logic.insert(2, (raceIndicator == race)) # type: ignore
+        logic.insert(0, demoCheck)
+        logic.insert(1, championship)
+        logic.insert(2, (raceIndicator == race))
         logic.insert(4, (address == con))
     return logic
 
@@ -426,14 +426,14 @@ ai5Lap = (raceData >> byte(0x190))
 def waitingOnWin():
     return [
         (raceState.delta() == 0x04),
-        (raceState == 0x05).with_flag(trigger)
+        trigger(raceState == 0x05)
     ]
 
 credits = byte(0x0e3251)
 creditIncrease = [
-    credits.delta().with_flag(add_source),
-    value(0x01).with_flag(add_source),
-    (value(0x00) == credits).with_flag(trigger) 
+    add_source(credits.delta()),
+    add_source(value(0x01)),
+    trigger(value(0x00) == credits) 
 ]
 ### Initialize Set ###
 mySet = AchievementSet(game_id=6675, title="South Park Rally")
@@ -485,7 +485,7 @@ for race in miniChampRaceOrder:
         playerWin,
         resetToCountdown,
         waitingOnWin(),
-        (raceTime > timesToBeat[raceOrder.index(race)]).with_flag(reset_if)
+        reset_if(raceTime > timesToBeat[raceOrder.index(race)])
     ]
     timeTrialAchievement = Achievement(achievementTitle(f"{order}_dev"), f"Beat PS2Hagrid's time of {timesToBeatDesc[miniChampRaceOrder.index(race)]} {trackName(race, True)} in Mini Championship mode", 1)
     timeTrialAchievement.add_core(timeTrialAchievementLogic)
@@ -499,7 +499,7 @@ def garrisonUnlock():
     garrisonUnlockLogic = [
         commonChampionshipLogic(0x01),
         raceOutcome,
-        playerWin.with_flag(trigger),
+        trigger(playerWin),
         resetToCountdown
     ]
 
@@ -507,14 +507,14 @@ def garrisonUnlock():
         bit_func = getattr(helpers, f"bit{checkpoint}")
 
         droveOverCheckpoint = (raceData >> bit_func(0xc0))
-        garrisonUnlockLogic.append((droveOverCheckpoint == 0x00).with_flag(and_next))
-        garrisonUnlockLogic.append((rallyDays2Checkpoint.delta() > 0x00).with_flag(reset_if))
+        garrisonUnlockLogic.append(and_next(droveOverCheckpoint == 0x00))
+        garrisonUnlockLogic.append(reset_if(rallyDays2Checkpoint.delta() > 0x00))
 
-    garrisonUnlockLogic.append((raceState != 0x04).with_flag(and_next))
-    garrisonUnlockLogic.append(((raceData >> byte(0x0c)) != 0x0f).with_flag(reset_if))
-    garrisonUnlockLogic.append(((raceData >> byte(0x0c)) == 0x0f).with_flag(reset_if))
+    garrisonUnlockLogic.append(and_next(raceState != 0x04))
+    garrisonUnlockLogic.append(reset_if((raceData >> byte(0x0c)) != 0x0f))
+    garrisonUnlockLogic.append(reset_if((raceData >> byte(0x0c)) == 0x0f))
     garrisonUnlockLogic.append((raceState.delta() == 0x04))
-    garrisonUnlockLogic.append((raceState == 0x05).with_flag(trigger))
+    garrisonUnlockLogic.append(trigger(raceState == 0x05))
 
 
     garrisonAchievement = Achievement(achievementTitle("mr_garrison"), "Unlock Mr. Garrison by being the only player to pass over each checkpoint with the trophy in Rally Days #2", 2)
@@ -526,7 +526,7 @@ def pipUnlock():
     pipUnlockLogic = [
         commonChampionshipLogic(0x01),
         raceOutcome,
-        playerWin.with_flag(trigger),
+        trigger(playerWin),
         resetToCountdown
     ]
 
@@ -536,18 +536,18 @@ def pipUnlock():
         droveOverCheckpoint = (raceData >> bit_func(0xc0))
 
         if checkpoint == 0x00:
-            pipUnlockLogic.append((droveOverCheckpoint == 0x00).with_flag(and_next))
-            pipUnlockLogic.append((rallyDays2Checkpoint.delta() > 0x00).with_flag(reset_if))
+            pipUnlockLogic.append(and_next(droveOverCheckpoint == 0x00))
+            pipUnlockLogic.append(reset_if(rallyDays2Checkpoint.delta() > 0x00))
         else:
-            pipUnlockLogic.append((droveOverCheckpoint == 0x01).with_flag(reset_if))
+            pipUnlockLogic.append(reset_if(droveOverCheckpoint == 0x01))
 
 
 
-    pipUnlockLogic.append((raceState != 0x04).with_flag(and_next))
-    pipUnlockLogic.append(((raceData >> byte(0x0c)) != 0x09).with_flag(reset_if))
-    pipUnlockLogic.append(((raceData >> byte(0x0c)) == 0x09).with_flag(reset_if))
+    pipUnlockLogic.append(and_next(raceState != 0x04))
+    pipUnlockLogic.append(reset_if((raceData >> byte(0x0c)) != 0x09))
+    pipUnlockLogic.append(reset_if((raceData >> byte(0x0c)) == 0x09))
     pipUnlockLogic.append((raceState.delta() == 0x04))
-    pipUnlockLogic.append((raceState == 0x05).with_flag(trigger))
+    pipUnlockLogic.append(trigger(raceState == 0x05))
 
 
     pipAchievement = Achievement(achievementTitle("pip"), "Unlock Pip by passing over only Checkpoints 1 and 4 with the trophy in Rally Days #2", 2)
@@ -560,7 +560,7 @@ def bebeUnlock():
         commonChampionshipLogic(0x02),
         raceOutcome,
         playerWin,
-        (unlockTimers.delta() < 120.0).with_flag(reset_if),
+        reset_if(unlockTimers.delta() < 120.0),
         resetToCountdown,
         waitingOnWin()
     ]
@@ -607,12 +607,12 @@ def msCartmanUnlock():
         raceOutcome,
         playerWin,
         resetToCountdown,
-        (playerCheckpoint == 0x04).with_flag(trigger),
-        (ai1Checkpoint != 0x00).with_flag(reset_if),
-        (ai2Checkpoint != 0x00).with_flag(reset_if),
-        (ai3Checkpoint != 0x00).with_flag(reset_if),
-        (ai4Checkpoint != 0x00).with_flag(reset_if),
-        (ai5Checkpoint != 0x00).with_flag(reset_if),
+        trigger(playerCheckpoint == 0x04),
+        reset_if(ai1Checkpoint != 0x00),
+        reset_if(ai2Checkpoint != 0x00),
+        reset_if(ai3Checkpoint != 0x00),
+        reset_if(ai4Checkpoint != 0x00),
+        reset_if(ai5Checkpoint != 0x00),
         waitingOnWin()
     ]
     msCartmanAchievement = Achievement(achievementTitle("ms_cartman"), "Unlock Ms. Cartman by being the only player to deliver lemonade during the Pink Lemonade race", 2)
@@ -633,12 +633,12 @@ def visitorUnlock():
 
 def nedUnlock():
     nedLogic = [
-        (demoCheck).with_flag(measured_if),
-        (championship).with_flag(measured_if),
-        (raceIndicator == 0x09).with_flag(measured_if),
+        measured_if(demoCheck),
+        measured_if(championship),
+        measured_if(raceIndicator == 0x09),
         raceOutcome,
         playerWin,
-        (raceData >> byte(0xc8) >= 0x0c).with_flag(measured),
+        measured(raceData >> byte(0xc8) >= 0x0c),
         waitingOnWin()
     ]
     nedAchievement = Achievement(achievementTitle("ned"), "Unlock Ned by winning after using 12 Caffeine Boosts or Terrance Boosts during the Independence Day race", 2)
@@ -662,7 +662,7 @@ def marvinUnlock():
     marvinLogic = [
         commonChampionshipLogic(0x0b),
         playerFinish,
-        (playerCheckpoint != 0x00).with_flag(reset_if),
+        reset_if(playerCheckpoint != 0x00),
         resetToCountdown,
         waitingOnWin()
     ]
@@ -675,7 +675,7 @@ def damienUnlock():
         commonChampionshipLogic(0x0d),
         raceOutcome,
         playerWin,
-        (raceData >> byte(0xc4) != 0x00).with_flag(reset_if),
+        reset_if(raceData >> byte(0xc4) != 0x00),
         resetToCountdown,
         waitingOnWin()
     ]
@@ -730,6 +730,24 @@ for race in range(0x00, 0x0e):
 
 # Race as X in Y track (any race)
 
+
+def challengeChar(char: List[int], offset: bool = False):
+    if offset:
+        for index, c in enumerate(char):
+            if c >= 0x0c:
+                c = c - 1
+            if index + 1 == len(char):
+                return(character == c)
+            else:
+                return(or_next(character == c))
+    else:
+        for index, c in enumerate(char):
+            if index + 1== len(char):
+                return(character == c)
+            else:
+                return(or_next(character == c))
+
+
 trackToRaces = [
     [], # City
     [], # Forest
@@ -741,56 +759,43 @@ trackToRaces = [
     [], # Carnival
 ]
 
-def challengeChar(char: List[int]):
-    for index, c in enumerate(char):
-        if index + 1== len(char):
-            return(character == c)
+def convertTracksToRaces(track: int):
+    for index, race in enumerate(trackToRaces[track]):
+        if index + 1== len(trackToRaces[track]):
+            return(raceIndicator == race)
         else:
-            return((character == c).with_flag(or_next))
+            return(or_next(raceIndicator == race))
 
-
-
-def charOnTrack(char: List[int], track: int):
-    coreLogic = [
+def challengeCore():
+    return [
         demoCheck,
         modeAddress < 3
     ]
+
+def charOnTrack(char: List[int], track: int):
 
     # Alt 1
     alt1Logic = [
         raceOutcome,
         playerWin,
         modeAddress != 2, # not arcade
-        (challengeChar(char))
+        challengeChar(char),
+        convertTracksToRaces(track),
+        trackIndicator == track,
+        waitingOnWin()
     ]
-
-    alt1logic.append(challengeChar(char))
-    for index, race in enumerate(trackToRaces[track]):
-        if index + 1== len(trackToRaces[track]):
-            alt1Logic.append(raceIndicator == race)
-        else:
-            alt1Logic.append((raceIndicator == race).with_flag(or_next))
-    alt1Logic.append(trackIndicator == track)
-    alt1Logic.append(waitingOnWin())
     
     # Alt 2
     alt2Logic = [
         raceOutcome,
         playerWin,
         modeAddress == 2,
+        challengeChar(char),
+        trackIndicator == track,
+        waitingOnWin()
     ]
 
-    for index, c in enumerate(char):
-        if c >= 0x0c:
-            c = c - 1
-        if index + 1 == len(char):
-            alt2Logic.append(character == c)
-        else:
-            alt2Logic.append((character == c).with_flag(or_next))
-
-    alt2Logic.append(trackIndicator == track)
-    alt2Logic.append(waitingOnWin())
-    return [coreLogic, alt1Logic, alt2Logic]
+    return [challengeCore(), alt1Logic, alt2Logic]
 
 # BGA on BGA
 bgaBGA = Achievement(achievementTitle("1_challenge"), "Win any race at Big Gay Al's as Big Gay Al", 2)
@@ -819,22 +824,159 @@ nedJimboMountain.add_alt(nedJimboLogic[1])
 nedJimboMountain.add_alt(nedJimboLogic[2])
 mySet.add_achievement(nedJimboMountain)
 
+def charInRace(char: List[int], race: int):
+    coreLogic = [
+        challengeCore(),
+        modeAddress != 0x01
+    ]
 
+    logic = []
+    for x in [0x00, 0x02]:
+        logic.append([
+            raceOutcome,
+            playerWin,
+            modeAddress == x,
+            challengeChar(char, True if x == 0x02 else False),
+            raceIndicator == race,
+            waitingOnWin()
+        ])
+    return [coreLogic, logic[0], logic[1]]
 
+def raceOnTrack(race: int, track: int):
+    return [
+        raceOutcome,
+        playerWin,
+        modeAddress == 0x02,
+        raceIndicator == race,
+        trackIndicator == track,
+        waitingOnWin()
+    ]
 
+cartmanReadABook = Achievement(achievementTitle("4_challenge"), "Win the Read a Book Day race as Cartman Cop", 2)
+cartmanReadABookLogic = charInRace([0x10], 0x05)
+cartmanReadABook.add_core(cartmanReadABookLogic[0])
+cartmanReadABook.add_alt(cartmanReadABookLogic[1])
+cartmanReadABook.add_alt(cartmanReadABookLogic[2])
+mySet.add_achievement(cartmanReadABook)
+
+bhChefThanksgiving = Achievement(achievementTitle("5_challenge"), "Win the Thanksgiving race as Braveheart Chef", 2)
+bhChefThanksgivingLogic = charInRace([0x24], 0x0b)
+bhChefThanksgiving.add_core(bhChefThanksgivingLogic[0])
+bhChefThanksgiving.add_alt(bhChefThanksgivingLogic[1])
+bhChefThanksgiving.add_alt(bhChefThanksgivingLogic[2])
+mySet.add_achievement(bhChefThanksgiving)
+
+milleniumJesus = Achievement(achievementTitle("6_challenge"), "Win the Millenium New Year's Eve Race as Jesus", 2)
+milleniumJesusLogic = charInRace([0x1c], 0x0d)
+milleniumJesus.add_core(milleniumJesusLogic[0])
+milleniumJesus.add_alt(milleniumJesusLogic[1])
+milleniumJesus.add_alt(milleniumJesusLogic[2])
+mySet.add_achievement(milleniumJesus)
+
+rd2Volcano = Achievement(achievementTitle("7_challenge"), "Win the Rally Days #2 race at the Volcano", 2)
+rd2VolcanoLogic = raceOnTrack(0x01, 0x03)
+rd2Volcano.add_core(rd2VolcanoLogic)
+mySet.add_achievement(rd2Volcano)
+
+springCleaningForest = Achievement(achievementTitle("8_challenge"), "Win the Spring Cleaning race in the Forest", 2)
+springCleaningForestLogic = raceOnTrack(0x04, 0x01)
+springCleaningForest.add_core(springCleaningForestLogic)
+mySet.add_achievement(springCleaningForest)
+
+pinkLemonadeCarnival = Achievement(achievementTitle("9_challenge"), "Win the Pink Lemonade race at the Carnival", 2)
+pinkLemonadeCarnivalLogic = raceOnTrack(0x07, 0x07)
+pinkLemonadeCarnival.add_core(pinkLemonadeCarnivalLogic)
+mySet.add_achievement(pinkLemonadeCarnival)
+
+memorialBGA = Achievement(achievementTitle("10_challenge"), "Win the Memorial Day race at Big Gay Al's", 2)
+memorialBGALogic = raceOnTrack(0x08, 0x02)
+memorialBGA.add_core(memorialBGALogic)
+mySet.add_achievement(memorialBGA)
+
+christmasMountain = Achievement(achievementTitle("11_challenge"), "Win the Christmas Day race on the Mountain", 2)
+christmasMountainLogic = raceOnTrack(0x0c, 0x04)
+christmasMountain.add_core(christmasMountainLogic)
+mySet.add_achievement(christmasMountain)
+
+complexSewerRace = Achievement(achievementTitle("12_challenge"), "With the Random Checkpoints and Pick Ups options enabled as well as 5 random CPUs, win the Rally Days #2 race in the Sewer on Arcade mode with the map turned off before the countdown finishes and kept off for the entire race", 5)
+complexSewerRaceLogic = [
+    demoCheck,
+    modeAddress == 0x02,
+    byte(0x0e376a) == 0x01, # Random Checkpoints On
+    byte(0x0e3fde) == 0x01, # Pick Ups On
+    byte(0x0e352a) == 0x04, # 5 CPUs
+    byte(0x0e42fe) == 0x03, # HUD Off
+    trackIndicator == 0x06,
+    raceIndicator == 0x01,
+    raceOutcome,
+    playerWin,
+    resetToCountdown,
+    trigger(raceState.delta() == 0x04),
+    trigger(raceState == 0x05),
+    and_next(raceState == 0x04),
+    reset_if(byte(0x0e42fe) != 0x03) # HUD Off
+]
+complexSewerRace.add_core(complexSewerRaceLogic)
+mySet.add_achievement(complexSewerRace)
+
+memorialDayLaser = Achievement(achievementTitle("13_challenge"), "Win the Memorial Day race while being the only player to pass over all 4 checkpoints with the laser", 2)
+memorialDayLaserLogic = [
+    demoCheck,
+    modeAddress < 3,
+    modeAddress != 0x01,
+    raceOutcome,
+    playerWin,
+    raceIndicator == 0x08,
+    resetToCountdown,
+    reset_if(ai1Checkpoint > 0x00),
+    reset_if(ai2Checkpoint > 0x00),
+    reset_if(ai3Checkpoint > 0x00),
+    reset_if(ai4Checkpoint > 0x00),
+    reset_if(ai5Checkpoint > 0x00),
+    waitingOnWin(),
+]
+
+memorialDayLaser.add_core(memorialDayLaserLogic)
+mySet.add_achievement(memorialDayLaser)
+
+charUnlock1 = byte(0x0d9eb8)
+charUnlock2 = byte(0x0d9eb9)
+charUnlock3 = byte(0x0d9eba)
+charUnlock4 = byte(0x0d9ebb)
+
+magicalMysteryTour = Achievement(achievementTitle("14_challenge"), "Win the Championship without restarting after Rally Days #1 while playing as the Mystery character after unlocking every character. The icon will appear in the bottom right if you have everyone when you load into the race.", 50)
+magicalMysteryTourLogic = [
+    demoCheck,
+    reset_if(gameState == 0x06),
+    (raceIndicator == 0x00).with_hits(1),
+    trigger(raceIndicator == 0x0d),
+    championship,
+    character == 0x0b,
+    reset_if(credits < credits.delta()),
+    raceOutcome,
+    and_next(loadingScreen == 0x00),
+    and_next(raceData >> dword(0xa0) != 0x00), # race in progress
+    reset_if(raceData >> dword(0xa0) != recall()),
+    trigger(raceState.delta() == 0x04),
+    trigger(raceState == 0x05),
+    reset_if(charUnlock1 + charUnlock2 + charUnlock3 + charUnlock4 < 0x2b7)
+]
+
+magicalMysteryTour.add_core(magicalMysteryTourLogic)
+mySet.add_achievement(magicalMysteryTour)
 
 # Intro - likely UWC but was a good pointer test
 intro = Achievement(achievementTitle("intro"), "Watch the whole South Park intro", 0)
 introCore = [
-    (gameState.delta() == 0x02).with_flag(or_next),
-    (gameState.delta() == 0x03).with_flag(reset_if),
+    or_next(gameState.delta() == 0x02),
+    reset_if(gameState.delta() == 0x03),
     (gameState == 0x06)
 ]
 
 def introAlts(currentHz: int):
     return [
-        (hz == currentHz).with_flag(and_next),
-        (loadingScreen == 0x00).with_flag(and_next),
+        and_next(hz == currentHz),
+        and_next(loadingScreen == 0x00),
         (gameState.delta() == 0x04).with_hits(1420 if currentHz == 0x05 else 1700)
     ]
 
